@@ -1,59 +1,52 @@
 name: Release to Shared Folder
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-
-permissions:
-  contents: read
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   check-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get latest commit hash from last release (stored in a file or log)
-        id: last-release
+      - name: Get latest successful run commit
+        id: last-success
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LAST_COMMIT_FILE=".last_release_commit"
-          if [ -f "$LAST_COMMIT_FILE" ]; then
-            last_commit=$(cat "$LAST_COMMIT_FILE")
-          else
-            last_commit=""
-          fi
-          echo "last_commit=$last_commit" >> $GITHUB_OUTPUT
+          last_commit=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --event push \
+            --limit 1 \
+            --json headSha,status \
+            --jq '.[] | select(.status == "completed") | .headSha')
 
-      - name: Detect changes since last release
-        id: changes
+          echo "last_successful_commit=$last_commit" >> $GITHUB_OUTPUT
+
+      - name: Compare HEAD with last successful run
+        id: changed
         run: |
-          if [ -z "${{ steps.last-release.outputs.last_commit }}" ]; then
-            echo "First time release"
+          echo "Current HEAD: $(git rev-parse HEAD)"
+          echo "Last release: ${{ steps.last-success.outputs.last_successful_commit }}"
+
+          if [ "$(git rev-parse HEAD)" != "${{ steps.last-success.outputs.last_successful_commit }}" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
-            git diff --quiet ${{ steps.last-release.outputs.last_commit }} HEAD || echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Release to shared folder
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.changed.outputs.changed == 'true'
         run: |
           echo "Changes detected. Releasing..."
-
-          # Replace with actual sync method (rsync, scp, mount, etc.)
-          # Example: copying to mounted path
-          DEST_PATH="$HOME/my-project-$(date +%Y%m%d%H%M%S)"
-          mkdir -p "$DEST_PATH"
-          ls -lhrt 
-          cp -r . "$DEST_PATH"
-          ls -lhrt $DEST_PATH
-          
-          # Save current commit as the last released one
-          git rev-parse HEAD > .last_release_commit
-
-          echo "Release copied to $DEST_PATH"
+          DEST="$HOME/shared-folder/my-project"
+          mkdir -p "$DEST"
+          rsync -a --delete ./ "$DEST"
+          echo "Release completed."
