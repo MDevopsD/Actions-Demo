@@ -1,0 +1,63 @@
+name: Smart Release on Change
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Download last commit artifact (if exists)
+      id: download
+      uses: actions/download-artifact@v4
+      with:
+        name: last-commit
+      continue-on-error: true
+
+    - name: Read last commit (if any)
+      id: last
+      run: |
+        if [ -f last_commit.txt ]; then
+          LAST_COMMIT=$(cat last_commit.txt)
+          echo "Last recorded commit: $LAST_COMMIT"
+          echo "last_commit=$LAST_COMMIT" >> $GITHUB_OUTPUT
+        else
+          echo "No previous commit file"
+          echo "last_commit=" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Compare with current commit
+      id: check
+      run: |
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        echo "Current commit: $CURRENT_COMMIT"
+        if [ "${{ steps.last.outputs.last_commit }}" != "$CURRENT_COMMIT" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run release if changed
+      if: steps.check.outputs.changed == 'true'
+      run: |
+        echo "Changes detected – releasing..."
+        # Insert your release logic here
+
+    - name: Save current commit for next run
+      if: steps.check.outputs.changed == 'true'
+      run: |
+        echo "$(git rev-parse HEAD)" > last_commit.txt
+      # Upload as artifact
+    - name: Upload current commit artifact
+      if: steps.check.outputs.changed == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: last-commit
+        path: last_commit.txt
