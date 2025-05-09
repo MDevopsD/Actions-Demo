@@ -1,4 +1,4 @@
-name: Smart Release on Change
+name: Release on Changes Without Tags
 
 on:
   workflow_dispatch:
@@ -7,38 +7,31 @@ on:
       - main
 
 jobs:
-  check-changes:
+  check-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: Checkout current repo
       uses: actions/checkout@v4
-
-    - name: Download last commit artifact (if exists)
-      id: download
-      uses: actions/download-artifact@v4
       with:
-        name: last-commit
-      continue-on-error: true
+        fetch-depth: 0
 
-    - name: Read last commit (if any)
+    - name: Get current commit
+      id: current
+      run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Fetch last released commit from state branch
       id: last
       run: |
-        if [ -f last_commit.txt ]; then
-          LAST_COMMIT=$(cat last_commit.txt)
-          echo "Last recorded commit: $LAST_COMMIT"
-          echo "last_commit=$LAST_COMMIT" >> $GITHUB_OUTPUT
-        else
-          echo "No previous commit file"
-          echo "last_commit=" >> $GITHUB_OUTPUT
-        fi
+        git fetch origin release-state:release-state || git checkout -b release-state
+        LAST_COMMIT=$(git show origin/release-state:last_commit.txt 2>/dev/null || echo "")
+        echo "Last release commit: $LAST_COMMIT"
+        echo "last_commit=$LAST_COMMIT" >> $GITHUB_OUTPUT
 
-    - name: Compare with current commit
+    - name: Check if release is needed
       id: check
       run: |
-        CURRENT_COMMIT=$(git rev-parse HEAD)
-        echo "Current commit: $CURRENT_COMMIT"
-        if [ "${{ steps.last.outputs.last_commit }}" != "$CURRENT_COMMIT" ]; then
+        if [ "${{ steps.current.outputs.hash }}" != "${{ steps.last.outputs.last_commit }}" ]; then
           echo "changed=true" >> $GITHUB_OUTPUT
         else
           echo "changed=false" >> $GITHUB_OUTPUT
@@ -47,17 +40,16 @@ jobs:
     - name: Run release if changed
       if: steps.check.outputs.changed == 'true'
       run: |
-        echo "Changes detected – releasing..."
-        # Insert your release logic here
+        echo "Changes detected — releasing..."
+        # Your release logic here (e.g., tag, deploy, upload, etc.)
 
-    - name: Save current commit for next run
+    - name: Update last_commit.txt and push to state branch
       if: steps.check.outputs.changed == 'true'
       run: |
-        echo "$(git rev-parse HEAD)" > last_commit.txt
-      # Upload as artifact
-    - name: Upload current commit artifact
-      if: steps.check.outputs.changed == 'true'
-      uses: actions/upload-artifact@v4
-      with:
-        name: last-commit
-        path: last_commit.txt
+        echo "${{ steps.current.outputs.hash }}" > last_commit.txt
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+        git checkout -B release-state
+        git add last_commit.txt
+        git commit -m "Update last release commit"
+        git push origin release-state --force
