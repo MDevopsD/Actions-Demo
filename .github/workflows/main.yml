@@ -1,46 +1,44 @@
-name: Release on Content Change
+name: Release on Repo Changes
 
 on:
+  workflow_dispatch:  # Manual trigger
   push:
-    paths:
-      - 'shared-content/**'
     branches:
-      - main
-  workflow_dispatch:
+      - main           # Or your release branch
 
 jobs:
-  release:
+  check-for-changes:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required to compare with older tags
 
-      - name: Compute checksum of shared-content
-        id: checksum
+      - name: Get latest release tag
+        id: last-release
         run: |
-          find shared-content -type f -exec sha256sum {} \; | sort | sha256sum > current.sha
-          if [ -f .release-last.sha ]; then
-            if cmp -s current.sha .release-last.sha; then
-              echo "No changes detected."
-              echo "release_needed=false" >> $GITHUB_OUTPUT
-            else
-              echo "Changes detected."
-              echo "release_needed=true" >> $GITHUB_OUTPUT
-            fi
+          tag=$(git describe --tags --abbrev=0 || echo "")
+          echo "Latest tag: $tag"
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Check for changes since last release
+        id: changes
+        run: |
+          if [ -z "${{ steps.last-release.outputs.tag }}" ]; then
+            echo "No previous tag found. Treating as first release."
+            echo "changed=true" >> $GITHUB_OUTPUT
           else
-            echo "First time run."
-            echo "release_needed=true" >> $GITHUB_OUTPUT
+            git diff --quiet ${{ steps.last-release.outputs.tag }} HEAD || echo "changed=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run release step
-        if: steps.checksum.outputs.release_needed == 'true'
+      - name: Release if changes detected
+        if: steps.changes.outputs.changed == 'true'
         run: |
-          echo "🔁 Releasing content..."
-          # Replace with your actual release logic
-          # e.g. upload files, deploy, tag, etc.
-
-      - name: Save current hash for next run
-        if: steps.checksum.outputs.release_needed == 'true'
-        run: |
-          cp current.sha .release-last.sha
+          echo "🔁 Changes detected. Performing release..."
+          NEW_TAG="release-$(date +%Y%m%d%H%M%S)"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
