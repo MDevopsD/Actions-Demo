@@ -1,0 +1,57 @@
+name: Release to Shared Folder
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest commit hash from last release (stored in a file or log)
+        id: last-release
+        run: |
+          LAST_COMMIT_FILE=".last_release_commit"
+          if [ -f "$LAST_COMMIT_FILE" ]; then
+            last_commit=$(cat "$LAST_COMMIT_FILE")
+          else
+            last_commit=""
+          fi
+          echo "last_commit=$last_commit" >> $GITHUB_OUTPUT
+
+      - name: Detect changes since last release
+        id: changes
+        run: |
+          if [ -z "${{ steps.last-release.outputs.last_commit }}" ]; then
+            echo "First time release"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            git diff --quiet ${{ steps.last-release.outputs.last_commit }} HEAD || echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Release to shared folder
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          echo "Changes detected. Releasing..."
+
+          # Replace with actual sync method (rsync, scp, mount, etc.)
+          # Example: copying to mounted path
+          DEST_PATH="/mnt/shared/releases/my-project-$(date +%Y%m%d%H%M%S)"
+          mkdir -p "$DEST_PATH"
+          cp -r . "$DEST_PATH"
+
+          # Save current commit as the last released one
+          git rev-parse HEAD > .last_release_commit
+
+          echo "Release copied to $DEST_PATH"
