@@ -52,7 +52,7 @@ jobs:
           ls -lhrt 
           cp -v . "$DEST_PATH"
           ls -lhrt $DEST_PATH
-
+          
           # Save current commit as the last released one
           git rev-parse HEAD > .last_release_commit
 
