@@ -50,7 +50,7 @@ jobs:
           DEST_PATH="$HOME/my-project-$(date +%Y%m%d%H%M%S)"
           mkdir -p "$DEST_PATH"
           ls -lhrt 
-          cp -v . "$DEST_PATH"
+          cp -r . "$DEST_PATH"
           ls -lhrt $DEST_PATH
           
           # Save current commit as the last released one
