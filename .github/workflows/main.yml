@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main           # Or your release branch
+permissions:
+  contents: write
 
 jobs:
   check-for-changes:
