@@ -1,52 +1,41 @@
 name: Release to Shared Folder
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:     # Optional: allows manual triggering too
 
 jobs:
   check-and-release:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Needed to get full commit history
 
-      - name: Get latest successful run commit
-        id: last-success
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Fetch latest changes from main
+        run: git fetch origin main
+
+      - name: Check for new commits in the last hour
+        id: check_changes
         run: |
-          last_commit=$(gh run list \
-            --workflow "${{ github.workflow }}" \
-            --branch main \
-            --event push \
-            --limit 1 \
-            --json headSha,status \
-            --jq '.[] | select(.status == "completed") | .headSha')
-
-          echo "last_successful_commit=$last_commit" >> $GITHUB_OUTPUT
-
-      - name: Compare HEAD with last successful run
-        id: changed
-        run: |
-          echo "Current HEAD: $(git rev-parse HEAD)"
-          echo "Last release: ${{ steps.last-success.outputs.last_successful_commit }}"
-
-          if [ "$(git rev-parse HEAD)" != "${{ steps.last-success.outputs.last_successful_commit }}" ]; then
+          if git log origin/main --since="1 hour ago" --pretty=oneline | grep .; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Release to shared folder
-        if: steps.changed.outputs.changed == 'true'
+        if: steps.check_changes.outputs.changed == 'true'
         run: |
           echo "Changes detected. Releasing..."
           DEST="$HOME/shared-folder/my-project"
           mkdir -p "$DEST"
           rsync -a --delete ./ "$DEST"
-          echo "Release completed."
+          echo "Release completed to $DEST."
+
+      - name: No changes, skip release
+        if: steps.check_changes.outputs.changed == 'false'
+        run: echo "No new commits since the last hour. Skipping release."
