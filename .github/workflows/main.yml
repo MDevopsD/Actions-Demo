@@ -1,0 +1,46 @@
+name: Release on Content Change
+
+on:
+  push:
+    paths:
+      - 'shared-content/**'
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compute checksum of shared-content
+        id: checksum
+        run: |
+          find shared-content -type f -exec sha256sum {} \; | sort | sha256sum > current.sha
+          if [ -f .release-last.sha ]; then
+            if cmp -s current.sha .release-last.sha; then
+              echo "No changes detected."
+              echo "release_needed=false" >> $GITHUB_OUTPUT
+            else
+              echo "Changes detected."
+              echo "release_needed=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "First time run."
+            echo "release_needed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run release step
+        if: steps.checksum.outputs.release_needed == 'true'
+        run: |
+          echo "🔁 Releasing content..."
+          # Replace with your actual release logic
+          # e.g. upload files, deploy, tag, etc.
+
+      - name: Save current hash for next run
+        if: steps.checksum.outputs.release_needed == 'true'
+        run: |
+          cp current.sha .release-last.sha
