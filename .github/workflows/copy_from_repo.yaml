@@ -1,0 +1,26 @@
+name: Copy File from MDevopsD/test
+
+on: [push]
+
+jobs:
+  copy-file:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout your main repository
+      - name: Checkout main repository
+        uses: actions/checkout@v3
+
+      # Step 2: Checkout the MDevopsD/test repository into a folder named 'external-repo'
+      - name: Checkout MDevopsD/test repo
+        uses: actions/checkout@v3
+        with:
+          repository: MDevopsD/test
+          path: external-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 3: Copy the desired file (adjust path as needed)
+      - name: Copy file from external repo
+        run: |
+          mkdir -p copied-files  # Optional: create a target folder
+          cp external-repo/path/to/your-file.txt copied-files/
