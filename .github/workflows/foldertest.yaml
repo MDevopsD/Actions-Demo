@@ -1,7 +1,7 @@
 name: Tar All Folders
 
 on:
-  workflow_dispatch:
+  push
 
 jobs:
   tar-all:
@@ -23,4 +23,3 @@ jobs:
       - name: Archive folders
         run: |
           echo $FOLDERS
-\
