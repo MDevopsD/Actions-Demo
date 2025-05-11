@@ -3,7 +3,7 @@ name: Copy File from MDevopsD/test Repo
 on:
   push:
     branches:
-      - main  # or change to your desired branch
+      - main  # or your desired branch
 
 jobs:
   copy-file:
@@ -14,13 +14,14 @@ jobs:
       - name: Checkout main repository
         uses: actions/checkout@v3
 
-      # Step 2: Checkout the MDevopsD/test repository
+      # Step 2: Checkout the MDevopsD/test repository (specify branch if needed)
       - name: Checkout external repository
         uses: actions/checkout@v3
         with:
           repository: MDevopsD/test
+          ref: main  # Specify the branch explicitly
           path: external-repo
-          token: ${{ secrets.OTHER_REPO_TOKEN }}  # Personal Access Token for private repo access
+          token: ${{ secrets.OTHER_REPO_TOKEN }}  # Use your secret PAT here
 
       # Step 3: Copy the file from external repo to a local folder
       - name: Copy file to workspace folder
