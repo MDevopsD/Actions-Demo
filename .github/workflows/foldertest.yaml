@@ -1,0 +1,26 @@
+name: Tar All Folders
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tar-all:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Make output folder
+        run: mkdir -p Myfolder
+
+      - name: Load environment variables
+        run: |
+          set -a
+          source .env
+          set +a
+
+      - name: Archive folders
+        run: |
+          echo "FOLDERS=$FOLDERS"
+          tar -czf Myfolder/TEST.tar.gz $FOLDERS
