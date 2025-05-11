@@ -1,7 +1,7 @@
 name: Tar multiple folders
 
 on:
-  workflow_dispatch:
+  push:
 
 jobs:
   tar-job:
