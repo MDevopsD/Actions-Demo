@@ -22,5 +22,5 @@ jobs:
 
       - name: Archive folders
         run: |
-          echo "FOLDERS=$FOLDERS"
-          tar -czf Myfolder/TEST.tar.gz $FOLDERS
+          echo $FOLDERS
+\
