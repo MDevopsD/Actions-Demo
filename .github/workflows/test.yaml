@@ -26,9 +26,6 @@ jobs:
           FOLDERS=$(echo "$FOLDERS_JSON" | jq -r '.[]' | xargs)
           echo "Tarring folders: $FOLDERS"
           tar -czf selected-folders.tar.gz $FOLDERS
+          tar -xvf  selected-folders.tar.gz
 
-      - name: Upload tarball
-        uses: actions/upload-artifact@v2
-        with:
-          name: selected-folders
-          path: selected-folders.tar.gz
+
