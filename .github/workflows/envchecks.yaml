@@ -1,47 +1,21 @@
-name: Fast DIR Selector
+- name: Set DIR
+  run: |
+    echo "⏰ Triggered by: ${{ github.event_name }}"
+    if [ "${{ github.event_name }}" = "schedule" ]; then
+      ENV_TYPE="production"
+    else
+      ENV_TYPE="${{ inputs.env_type }}"
+    fi
 
-on:
-  workflow_dispatch:
-    inputs:
-      env_type:
-        description: 'Environment type (production or test)'
-        required: false
-        default: 'production'
+    echo "▶ Selected ENV_TYPE: $ENV_TYPE"
 
-  schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
+    if [ "$ENV_TYPE" != "production" ] && [ "$ENV_TYPE" != "test" ]; then
+      echo "❌ Invalid env_type: $ENV_TYPE"
+      exit 1
+    fi
 
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    env:
-      DIR_PRD: /path/prd
-      DIR_TEST: /path/test
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set DIR
-        run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            ENV_TYPE="production"
-          else
-            ENV_TYPE="${{ inputs.env_type }}"
-          fi
-
-          echo "▶ Selected ENV_TYPE: $ENV_TYPE"
-
-          if [ "$ENV_TYPE" != "production" ] && [ "$ENV_TYPE" != "test" ]; then
-            echo "❌ Invalid env_type: $ENV_TYPE"
-            exit 1
-          fi
-
-          if [ "$ENV_TYPE" = "production" ]; then
-            echo "DIR=${DIR_PRD}" >> $GITHUB_ENV
-          else
-            echo "DIR=${DIR_TEST}" >> $GITHUB_ENV
-          fi
-
-      - name: Use DIR
-        run: |
-          echo "📁 Running in directory: $DIR"
+    if [ "$ENV_TYPE" = "production" ]; then
+      echo "DIR=${DIR_PRD}" >> $GITHUB_ENV
+    else
+      echo "DIR=${DIR_TEST}" >> $GITHUB_ENV
+    fi
