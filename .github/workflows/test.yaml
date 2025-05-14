@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: create folder 
-        run |
+        run: |
           mkdir -p /folders/folder1 
           mkdir -p /folders/folder2
           mkdir -p /folders/folder3
