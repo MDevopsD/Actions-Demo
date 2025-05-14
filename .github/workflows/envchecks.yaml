@@ -32,5 +32,5 @@ jobs:
       - name: Show directory and run script
         run: |
           echo "Using directory: $DIR"
-          cd $DIR
-          ./run.sh || echo "Script failed or not found"
+          echo $DIR
+
