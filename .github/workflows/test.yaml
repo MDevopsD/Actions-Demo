@@ -1,11 +1,11 @@
 name: Tar from JSON Input (Jenkins-style)
 
 on:
-  workflow_dispatch:
+  push:
 
 jobs:
   tar-folders:
-    runs-on: self-hosted  # Must have access to /mnt/shared/folders
+    runs-on: ubuntu-latest  # Must have access to /mnt/shared/folders
 
     env:
       FOLDERS_JSON: '[
