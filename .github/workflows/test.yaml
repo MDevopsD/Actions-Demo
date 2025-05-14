@@ -5,7 +5,10 @@ on:
 
 jobs:
   tar-folders:
-    runs-on: ubuntu-latest  # GitHub-hosted runner
+    runs-on: ubuntu-latest
+
+    env:
+      FOLDERS_JSON: '[ "./folders/folder1", "./folders/folder2", "./folders/folder3" ]'
 
     steps:
       - name: Checkout repo
@@ -13,24 +16,19 @@ jobs:
 
       - name: Create folders for testing
         run: |
-          # Create folder structure inside the GitHub runner's workspace
           mkdir -p ./folders/folder1
           mkdir -p ./folders/folder2
           mkdir -p ./folders/folder3
 
-      - name: Set environment variable for folders
-        env:
-          FOLDERS_JSON: '[
-            "./folders/folder1",
-            "./folders/folder2",
-            "./folders/folder3"
-          ]'
+      - name: Parse JSON and run tar
         run: |
           # Convert JSON array to space-separated folder list
           FOLDERS=$(echo "$FOLDERS_JSON" | jq -r '.[]' | xargs)
-          
           echo "Tarring folders: $FOLDERS"
-          
-          # Run tar with all folders in one command (like Jenkins)
           tar -czf selected-folders.tar.gz $FOLDERS
 
+      - name: Upload tarball
+        uses: actions/upload-artifact@v2
+        with:
+          name: selected-folders
+          path: selected-folders.tar.gz
