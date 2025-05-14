@@ -1,4 +1,4 @@
-name: Conditional Directory via Input
+name: Conditional Directory via Input or Schedule
 
 on:
   workflow_dispatch:
@@ -6,10 +6,10 @@ on:
       env_type:
         description: 'Environment type (production or test)'
         required: false
-        default: 'production'  # Default set to production
+        default: 'production'
 
   schedule:
-    - cron: '0 3 * * *'  # daily at 3am UTC, uses production
+    - cron: '*/5 * * * *'  # Every 5 minutes for testing
 
 jobs:
   set-dir-based-on-env:
@@ -22,10 +22,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set DIR based on env_type
+      - name: Set DIR based on env_type or schedule
         run: |
-          echo "Selected env_type: ${{ inputs.env_type }}"
-          if [ "${{ inputs.env_type }}" = "production" ]; then
+          # Interpolate GitHub context into a shell variable
+          ENV_TYPE="${{ github.event_name == 'schedule' && 'production' || inputs.env_type }}"
+
+          echo "Selected env_type: $ENV_TYPE"
+
+          # Validate env_type
+          if [ "$ENV_TYPE" != "production" ] && [ "$ENV_TYPE" != "test" ]; then
+            echo "❌ Invalid env_type: $ENV_TYPE"
+            echo "Allowed values are: production, test"
+            exit 1
+          fi
+
+          # Set DIR based on env_type
+          if [ "$ENV_TYPE" = "production" ]; then
             echo "DIR=${DIR_PRD}" >> $GITHUB_ENV
           else
             echo "DIR=${DIR_TEST}" >> $GITHUB_ENV
@@ -34,5 +46,5 @@ jobs:
       - name: Show directory and run script
         run: |
           echo "Using directory: $DIR"
-          cd $DIR
-          ./run.sh || echo "Script failed or not found"
+          # Simulate script execution
+          echo "Running in directory: $DIR"
