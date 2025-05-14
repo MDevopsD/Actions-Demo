@@ -34,8 +34,3 @@ jobs:
           # Run tar with all folders in one command (like Jenkins)
           tar -czf selected-folders.tar.gz $FOLDERS
 
-      - name: Upload tarball
-        uses: actions/upload-artifact@v3
-        with:
-          name: selected-folders
-          path: selected-folders.tar.gz
