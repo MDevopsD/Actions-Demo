@@ -15,7 +15,9 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Create folders for testing
+        if: false
         run: |
+      
           mkdir -p ./folders/folder1
           mkdir -p ./folders/folder2
           mkdir -p ./folders/folder3
