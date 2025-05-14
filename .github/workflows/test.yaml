@@ -5,19 +5,21 @@ on:
 
 jobs:
   tar-folders:
-    runs-on: ubuntu-latest  # Must have access to /mnt/shared/folders
+    runs-on: ubuntu-latest  # Must have access to /folders
 
     env:
       FOLDERS_JSON: '[
-        "/mnt/shared/folders/folder1",
-        "/mnt/shared/folders/folder2",
-        "/mnt/shared/folders/folder3"
+        "/folders/folder1",
+        "/folders/folder2",
+        "/folders/folder3"
       ]'
 
     steps:
       - name: create folder 
         run |
-          mkdir -p /mnt/shared/folders/folder1 /mnt/shared/folders/folder2 /mnt/shared/folders/folder3
+          mkdir -p /folders/folder1 
+          mkdir -p /folders/folder2
+          mkdir -p /folders/folder3
        
       - name: Parse JSON and run tar
         run: |
