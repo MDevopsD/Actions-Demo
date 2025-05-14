@@ -1,0 +1,36 @@
+name: Tar from JSON Input (Jenkins-style)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tar-folders:
+    runs-on: self-hosted  # Must have access to /mnt/shared/folders
+
+    env:
+      FOLDERS_JSON: '[
+        "/mnt/shared/folders/folder1",
+        "/mnt/shared/folders/folder2",
+        "/mnt/shared/folders/folder3"
+      ]'
+
+    steps:
+      - name: create folder 
+        run |
+          mkdir -p /mnt/shared/folders/folder1 /mnt/shared/folders/folder2 /mnt/shared/folders/folder3
+       
+      - name: Parse JSON and run tar
+        run: |
+          # Convert JSON array to space-separated folder list
+          FOLDERS=$(echo "$FOLDERS_JSON" | jq -r '.[]' | xargs)
+          
+          echo "Tarring folders: $FOLDERS"
+          
+          # Run tar with all folders in one command (like Jenkins)
+          tar -czf selected-folders.tar.gz $FOLDERS
+
+      - name: Upload tarball
+        uses: actions/upload-artifact@v3
+        with:
+          name: selected-folders
+          path: selected-folders.tar.gz
