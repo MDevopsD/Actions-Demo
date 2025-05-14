@@ -5,23 +5,26 @@ on:
 
 jobs:
   tar-folders:
-    runs-on: ubuntu-latest  # Must have access to /folders
-
-    env:
-      FOLDERS_JSON: '[
-        "/folders/folder1",
-        "/folders/folder2",
-        "/folders/folder3"
-      ]'
+    runs-on: ubuntu-latest  # GitHub-hosted runner
 
     steps:
-      - name: create folder 
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Create folders for testing
         run: |
-          mkdir -p /folders/folder1 
-          mkdir -p /folders/folder2
-          mkdir -p /folders/folder3
-       
-      - name: Parse JSON and run tar
+          # Create folder structure inside the GitHub runner's workspace
+          mkdir -p ./folders/folder1
+          mkdir -p ./folders/folder2
+          mkdir -p ./folders/folder3
+
+      - name: Set environment variable for folders
+        env:
+          FOLDERS_JSON: '[
+            "./folders/folder1",
+            "./folders/folder2",
+            "./folders/folder3"
+          ]'
         run: |
           # Convert JSON array to space-separated folder list
           FOLDERS=$(echo "$FOLDERS_JSON" | jq -r '.[]' | xargs)
