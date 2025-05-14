@@ -11,26 +11,26 @@ on:
 jobs:
   set-dir-based-on-env:
     runs-on: ubuntu-latest
-  env: 
-  DIR_PRD: /path/prd
-  DIR_TEST: /path/test
+    env:
+      DIR_PRD: /path/prd
+      DIR_TEST: /path/test
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set directory based on env_type
+      - name: Set DIR based on env_type
         run: |
           echo "Selected env_type: ${{ inputs.env_type }}"
 
           if [ "${{ inputs.env_type }}" = "production" ]; then
-            echo "DIR_PRD-ENV=$DIR_PRD" >> $GITHUB_ENV
+            echo "DIR=${DIR_PRD}" >> $GITHUB_ENV
           else
-            echo "DIR_TES-ENVT=$DIR_TEST" >> $GITHUB_ENV
+            echo "DIR=${DIR_TEST}" >> $GITHUB_ENV
           fi
 
       - name: Show directory and run script
         run: |
           echo "Using directory: $DIR"
-          echo $DIR_PRD-ENV
-          echo $DIR_TEST-ENV
+          cd $DIR
+          ./run.sh || echo "Script failed or not found"
