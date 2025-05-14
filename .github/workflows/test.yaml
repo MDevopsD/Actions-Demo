@@ -27,5 +27,6 @@ jobs:
           echo "Tarring folders: $FOLDERS"
           tar -czf selected-folders.tar.gz $FOLDERS
           tar -xvf  selected-folders.tar.gz
+          ls -lhrt selected-folders.tar.gz
 
 
