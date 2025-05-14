@@ -6,7 +6,10 @@ on:
       env_type:
         description: 'Environment type (production or test)'
         required: false
-        default: 'test'
+        default: 'production'  # Default set to production
+
+  schedule:
+    - cron: '0 3 * * *'  # daily at 3am UTC, uses production
 
 jobs:
   set-dir-based-on-env:
@@ -22,7 +25,6 @@ jobs:
       - name: Set DIR based on env_type
         run: |
           echo "Selected env_type: ${{ inputs.env_type }}"
-
           if [ "${{ inputs.env_type }}" = "production" ]; then
             echo "DIR=${DIR_PRD}" >> $GITHUB_ENV
           else
@@ -32,5 +34,5 @@ jobs:
       - name: Show directory and run script
         run: |
           echo "Using directory: $DIR"
-          echo $DIR
-
+          cd $DIR
+          ./run.sh || echo "Script failed or not found"
