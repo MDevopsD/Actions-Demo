@@ -1,0 +1,40 @@
+name: Detect Recent File Changes
+
+on:
+  push:
+
+jobs:
+  check-for-changes:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Required to access full commit history
+
+      - name: Check for file changes in the last hour
+        id: check_changes
+        run: |
+          echo "🔍 Checking for file changes on origin/main in the last hour..."
+
+          git fetch origin main
+
+          LAST_COMMIT=$(git rev-list -1 --before='1 hour ago' origin/main)
+          echo "🕓 Last commit before 1 hour ago: $LAST_COMMIT"
+
+          CHANGES=$(git diff --name-only origin/main $LAST_COMMIT)
+
+          if [ -n "$CHANGES" ]; then
+            echo "✅ File changes detected:"
+            echo "$CHANGES"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ No file changes detected in the last hour."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run follow-up step if changes were found
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          echo "🚀 Changes found! Triggering next step..."
