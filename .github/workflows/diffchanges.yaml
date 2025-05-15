@@ -1,35 +1,85 @@
-name: Detect Recent File Changes
+name: Detect and Release on Recent Changes
 
 on:
-  push:             # Triggered on any push
-  workflow_dispatch: # Optional: allow manual trigger
+  push:
+  workflow_dispatch:
 
 jobs:
   check-for-changes:
     runs-on: ubuntu-latest
 
+    outputs:
+      changed: ${{ steps.check_changes.outputs.changed }}
+
     steps:
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Get full history for git diff to work
+          fetch-depth: 0
 
-      - name: Check for file changes in the last hour (dynamic branch, single-step)
+      - name: Check for file changes in the last hour
         id: check_changes
         run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "🔍 Checking for file changes on origin/$BRANCH in the last hour..."
+          echo "🔍 Checking for file changes on: $BRANCH"
 
           git fetch origin "$BRANCH"
-
           LAST_COMMIT=$(git rev-list -1 --before='1 hour ago' "origin/$BRANCH")
-          echo "🕓 Last commit before 1 hour ago: $LAST_COMMIT"
+          echo "🕓 Commit before 1 hour: $LAST_COMMIT"
 
           CHANGES=$(git diff --name-only "origin/$BRANCH" "$LAST_COMMIT")
 
           if [ -n "$CHANGES" ]; then
-            echo "✅ File changes detected:"
+            echo "✅ Changes found:"
             echo "$CHANGES"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ℹ️ No file changes detected in the last hour."
+            echo "ℹ️ No changes found."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-and-release:
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v3
+
+      - name: Run tests
+        id: run_tests
+        run: |
+          echo "🧪 Running tests..."
+          # Dummy test command simulation
+          echo "tests=passed" >> $GITHUB_OUTPUT
+
+      - name: Create and upload artifact
+        if: steps.run_tests.outputs.tests == 'passed'
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifact
+          path: ./dist  # Replace with actual output
+
+      - name: Send success email (dummy)
+        if: steps.run_tests.outputs.tests == 'passed'
+        run: |
+          echo "📧 Sending success email..."
+          echo "✅ Release completed successfully!"
+
+      - name: Send failure email (dummy)
+        if: failure()
+        run: |
+          echo "📧 Sending failure email..."
+          echo "❌ Tests failed. Investigate the issue."
+
+  notify-no-changes:
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify no changes (dummy)
+        run: |
+          echo "📧 Sending no-change email..."
+          echo "ℹ️ No changes detected. Skipping release."
