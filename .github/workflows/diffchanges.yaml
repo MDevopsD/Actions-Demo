@@ -1,7 +1,8 @@
 name: Detect Recent File Changes
 
 on:
-  push:
+  push:             # Triggered on any push
+  workflow_dispatch: # Optional: allow manual trigger
 
 jobs:
   check-for-changes:
@@ -11,30 +12,24 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Required to access full commit history
+          fetch-depth: 0  # Get full history for git diff to work
 
-      - name: Check for file changes in the last hour
+      - name: Check for file changes in the last hour (dynamic branch, single-step)
         id: check_changes
         run: |
-          echo "🔍 Checking for file changes on origin/main in the last hour..."
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "🔍 Checking for file changes on origin/$BRANCH in the last hour..."
 
-          git fetch origin main
+          git fetch origin "$BRANCH"
 
-          LAST_COMMIT=$(git rev-list -1 --before='1 hour ago' origin/main)
+          LAST_COMMIT=$(git rev-list -1 --before='1 hour ago' "origin/$BRANCH")
           echo "🕓 Last commit before 1 hour ago: $LAST_COMMIT"
 
-          CHANGES=$(git diff --name-only origin/main $LAST_COMMIT)
+          CHANGES=$(git diff --name-only "origin/$BRANCH" "$LAST_COMMIT")
 
           if [ -n "$CHANGES" ]; then
             echo "✅ File changes detected:"
             echo "$CHANGES"
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
             echo "ℹ️ No file changes detected in the last hour."
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Run follow-up step if changes were found
-        if: steps.check_changes.outputs.changed == 'true'
-        run: |
-          echo "🚀 Changes found! Triggering next step..."
