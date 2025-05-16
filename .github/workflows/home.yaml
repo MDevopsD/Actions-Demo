@@ -1,0 +1,20 @@
+name: Run in HOME Directory
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-in-home:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run command in $HOME
+        run: |
+          echo "Running from: $PWD"
+          ls -la
+        working-directory: ${{ env.HOME }}
