@@ -9,6 +9,9 @@ jobs:
   run-in-home:
     runs-on: ubuntu-latest
 
+    env:
+      HOME_DIR: $HOME  # Explicitly pass $HOME to GitHub Actions' env context
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -17,4 +20,4 @@ jobs:
         run: |
           echo "Running from: $PWD"
           ls -la
-        working-directory: ${{ env.HOME }}
+        working-directory: ${{ env.HOME_DIR }}
