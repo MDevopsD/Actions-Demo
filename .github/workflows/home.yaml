@@ -9,10 +9,10 @@ jobs:
   run-in-home:
     runs-on: ubuntu-latest
 
-    env:
-      HOME_DIR: $HOME  # Explicitly pass $HOME to GitHub Actions' env context
-
     steps:
+      - name: Set HOME path in GitHub env
+        run: echo "HOME_DIR=$HOME" >> $GITHUB_ENV
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
