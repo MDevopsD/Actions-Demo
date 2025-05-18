@@ -1,4 +1,4 @@
-name: Detect and Release on Recent Changes
+name: Detect and Release on Recent Change
 
 on:
   schedule:
