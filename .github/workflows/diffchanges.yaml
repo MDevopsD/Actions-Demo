@@ -1,68 +1,73 @@
-name: Detect and Release on Recent Change
+name: Detect and Release on Commit Changes
 
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # Every day at 2 AM UTC
-  workflow_dispatch:     # Allow manual triggering
+    - cron: '0 2 * * *'  # Runs daily at 2 AM UTC
+  push:
 
 jobs:
-  check-for-changes:
+  check-for-commit-changes:
     runs-on: ubuntu-latest
 
     outputs:
       changed: ${{ steps.check_changes.outputs.changed }}
 
     steps:
-      - name: Checkout the code
+      - name: Checkout repository
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important to access full commit history
+          fetch-depth: 0  # Important to access commit history
 
-      - name: Check for file changes in the last 24 hours
+      - name: Check if there are changes between last two commits
         id: check_changes
         run: |
-          set -e
-
-          echo "🔍 Checking for commits in the last 24 hours..."
-
-          # Debug: print commit history
-          echo "🔧 Commit history in the last 24h:"
-          git log --since="1 hours ago" --oneline || echo "No commits"
-
-          # Get latest commit hash in last 24 hours
-          RECENT_COMMIT=$(git log --since="24 hours ago" --pretty=format:"%H" -n 1)
-
-          if [ -z "$RECENT_COMMIT" ]; then
-            echo "ℹ️ No recent commits in last 24 hours."
+          # Fail-safe: Ensure at least two commits exist
+          if [ $(git rev-list --count HEAD) -lt 2 ]; then
+            echo "ℹ️ Not enough commits to compare."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          echo "🕓 Last commit: $RECENT_COMMIT"
+          # Get the latest and previous commit hashes
+          LATEST_COMMIT=$(git log -n 1 --pretty=format:"%H")
+          LAST_COMMIT=$(git log -n 2 --pretty=format:"%H" | tail -n 1)
 
-          # Detect changes in files since that commit
-          CHANGES=$(git diff --name-only "$RECENT_COMMIT"..HEAD)
+          echo "🧾 Latest commit: $LATEST_COMMIT"
+          echo "🧾 Previous commit: $LAST_COMMIT"
 
-          if [ -n "$CHANGES" ]; then
-            echo "✅ Changes detected:"
-            echo "$CHANGES"
+          # Get changed files between the two
+          FILES_CHANGED=$(git diff --name-only "$LAST_COMMIT" "$LATEST_COMMIT")
+
+          if [ -n "$FILES_CHANGED" ]; then
+            echo "✅ Files changed between commits:"
+            echo "$FILES_CHANGED"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ℹ️ Commit found but no file changes."
+            echo "ℹ️ No file changes between the last two commits."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
-  test-and-release:
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Do your release
-        run: echo "🚀 Releasing code..."
 
-  no-changes:
-    needs: check-for-changes
-    if: needs.check-for-changes.outputs.changed == 'false'
+  release-if-changed:
+    needs: check-for-commit-changes
+    if: needs.check-for-commit-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
+
     steps:
-      - name: No changes detected
-        run: echo "ℹ️ No changes in last 24 hours. Skipping release."
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Simulate release process
+        run: |
+          echo "🚀 Triggering release..."
+          echo "✅ Release done based on detected commit changes."
+
+  notify-no-changes:
+    needs: check-for-commit-changes
+    if: needs.check-for-commit-changes.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify no changes
+        run: |
+          echo "ℹ️ No relevant changes since last commit. Skipping release."
