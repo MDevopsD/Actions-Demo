@@ -1,5 +1,4 @@
 name: my testing
-
 on:
   schedule:
     - cron: '0 2 * * *'  # Trigger every day at 2 AM UTC
