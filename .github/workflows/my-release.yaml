@@ -1,41 +1,60 @@
-name: Release to Shared Folder
+name: Check for Changes and Release
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs every hour
-  workflow_dispatch:     # Optional: allows manual triggering too
-
+    - cron: '0 2 * * *'  # Every day at 2 AM UTC
+  workflow_dispatch:     # Allow manual triggering
+  push:
 jobs:
-  check-and-release:
+  check-for-changes:
     runs-on: ubuntu-latest
 
+    outputs:
+      changed: ${{ steps.check_changes.outputs.changed }}
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout the code
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Needed to get full commit history
+          fetch-depth: 0  # Ensures we have full git history
 
-      - name: Fetch latest changes from main
-        run: git fetch origin main
+      - name: Get the last commit hash
+        id: get_last_commit
+        run: |
+          # Get the last commit hash (it will be the last commit from HEAD)
+          LAST_COMMIT=$(git log -n 1 --pretty=format:"%H")
+          echo "🕓 Last commit: $LAST_COMMIT"
+          echo "last_commit=$LAST_COMMIT" >> $GITHUB_ENV
 
-      - name: Check for new commits in the last hour
+      - name: Check for changes since the last commit
         id: check_changes
         run: |
-          if git log origin/main --since="24 hour ago" --pretty=oneline | grep .; then
+          # Check for changes between the last commit and the current HEAD
+          CHANGES=$(git diff --name-only $LAST_COMMIT HEAD)
+
+          # If there are changes, proceed with setting the 'changed' flag
+          if [ -n "$CHANGES" ]; then
+            echo "✅ Changes detected since last commit."
             echo "changed=true" >> $GITHUB_OUTPUT
           else
+            echo "ℹ️ No changes detected since last commit."
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Release to shared folder
-        if: steps.check_changes.outputs.changed == 'true'
+  release:
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run tests and release
         run: |
-          echo "Changes detected. Releasing..."
-          DEST="$HOME/shared-folder/my-project"
-          mkdir -p "$DEST"
-          rsync -a --delete ./ "$DEST"
-          echo "Release completed to $DEST."
+          echo "🚀 Running tests and releasing code..."
+          # Your test and release logic goes here
 
-      - name: No changes, skip release
-        if: steps.check_changes.outputs.changed == 'false'
-        run: echo "No new commits since the last hour. Skipping release."
+  notify-no-changes:
+    needs: check-for-changes
+    if: needs.check-for-changes.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: No changes detected
+        run: echo "ℹ️ No changes detected. Skipping release."
