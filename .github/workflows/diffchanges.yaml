@@ -1,29 +1,33 @@
-name: Detect and Release on Commit Changes
+name: Detect and Release on Latest Commit Changes
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # Runs daily at 2 AM UTC
+    - cron: '0 2 * * *'  # Runs every day at 2 AM UTC
+
   push:
 
 jobs:
-  check-for-commit-changes:
+  check-for-latest-changes:
     runs-on: ubuntu-latest
 
     outputs:
-      changed: ${{ steps.check_changes.outputs.changed }}
+      changed: ${{ steps.detect.outputs.changed }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important to access commit history
+          fetch-depth: 0  # Important to access full commit history
 
-      - name: Check if there are changes between last two commits
-        id: check_changes
+      - name: Detect changes between latest and previous commit
+        id: detect
         run: |
-          # Fail-safe: Ensure at least two commits exist
-          if [ $(git rev-list --count HEAD) -lt 2 ]; then
+          echo "🔍 Checking for changes between the latest and previous commit..."
+
+          # Get the total number of commits
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          if [ "$COMMIT_COUNT" -lt 2 ]; then
             echo "ℹ️ Not enough commits to compare."
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -31,43 +35,50 @@ jobs:
 
           # Get the latest and previous commit hashes
           LATEST_COMMIT=$(git log -n 1 --pretty=format:"%H")
-          LAST_COMMIT=$(git log -n 2 --pretty=format:"%H" | tail -n 1)
-
           echo "🧾 Latest commit: $LATEST_COMMIT"
-          echo "🧾 Previous commit: $LAST_COMMIT"
 
-          # Get changed files between the two
-          FILES_CHANGED=$(git diff --name-only "$LAST_COMMIT" "$LATEST_COMMIT")
+          LAST_COMMIT=$(git log -n 2 --pretty=format:"%H" | tail -n 1)
+          echo "🧾 Last commit before the latest: $LAST_COMMIT"
 
-          if [ -n "$FILES_CHANGED" ]; then
-            echo "✅ Files changed between commits:"
-            echo "$FILES_CHANGED"
-            echo "changed=true" >> "$GITHUB_OUTPUT"
+          # Compare and get changed files
+          if [ "$LATEST_COMMIT" != "$LAST_COMMIT" ]; then
+              echo "✅ Commits are different. Checking for file changes..."
+
+              FILES_CHANGED=$(git show --pretty="" --name-only "$LATEST_COMMIT")
+
+              if [ -n "$FILES_CHANGED" ]; then
+                  echo "✅ Files changed in the latest commit:"
+                  echo "$FILES_CHANGED"
+                  echo "changed=true" >> "$GITHUB_OUTPUT"
+              else
+                  echo "ℹ️ No files changed in the latest commit."
+                  echo "changed=false" >> "$GITHUB_OUTPUT"
+              fi
           else
-            echo "ℹ️ No file changes between the last two commits."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "ℹ️ No new commits detected since the last workflow run."
+              echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
   release-if-changed:
-    needs: check-for-commit-changes
-    if: needs.check-for-commit-changes.outputs.changed == 'true'
+    needs: check-for-latest-changes
+    if: needs.check-for-latest-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Simulate release process
+      - name: Perform Release
         run: |
-          echo "🚀 Triggering release..."
-          echo "✅ Release done based on detected commit changes."
+          echo "🚀 Releasing based on latest commit changes."
+          # Simulate or run your actual release command here
 
-  notify-no-changes:
-    needs: check-for-commit-changes
-    if: needs.check-for-commit-changes.outputs.changed == 'false'
+  skip-release-if-no-change:
+    needs: check-for-latest-changes
+    if: needs.check-for-latest-changes.outputs.changed == 'false'
     runs-on: ubuntu-latest
 
     steps:
       - name: Notify no changes
         run: |
-          echo "ℹ️ No relevant changes since last commit. Skipping release."
+          echo "ℹ️ No changes found in the latest commit. Skipping release."
