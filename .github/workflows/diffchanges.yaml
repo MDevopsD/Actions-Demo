@@ -1,84 +1,76 @@
-name: Detect and Release on Latest Commit Changes
+name: Smart Detect and Release
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * *'  # Runs every day at 2 AM UTC
-
-  push:
+    - cron: '0 2 * * *'
 
 jobs:
-  check-for-latest-changes:
+  detect-changes:
     runs-on: ubuntu-latest
-
     outputs:
-      changed: ${{ steps.detect.outputs.changed }}
+      changed: ${{ steps.check.outputs.changed }}
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Important to access full commit history
+          fetch-depth: 0
 
-      - name: Detect changes between latest and previous commit
-        id: detect
+      - name: Get current commit
+        id: check
         run: |
-          echo "🔍 Checking for changes between the latest and previous commit..."
+          echo "🔍 Detecting changes for release..."
 
-          # Get the total number of commits
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          if [ "$COMMIT_COUNT" -lt 2 ]; then
-            echo "ℹ️ Not enough commits to compare."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "🧾 Current HEAD: $CURRENT_COMMIT"
+
+          # Create a file to store last released commit if it doesn't exist
+          if [ ! -f .last_release_commit ]; then
+            echo "⏳ No last release commit found, treating as first release."
+            echo "$CURRENT_COMMIT" > .last_release_commit
+            echo "changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Get the latest and previous commit hashes
-          LATEST_COMMIT=$(git log -n 1 --pretty=format:"%H")
-          echo "🧾 Latest commit: $LATEST_COMMIT"
+          LAST_COMMIT=$(cat .last_release_commit)
+          echo "🧾 Last released commit: $LAST_COMMIT"
 
-          LAST_COMMIT=$(git log -n 2 --pretty=format:"%H" | tail -n 1)
-          echo "🧾 Last commit before the latest: $LAST_COMMIT"
-
-          # Compare and get changed files
-          if [ "$LATEST_COMMIT" != "$LAST_COMMIT" ]; then
-              echo "✅ Commits are different. Checking for file changes..."
-
-              FILES_CHANGED=$(git show --pretty="" --name-only "$LATEST_COMMIT")
-
-              if [ -n "$FILES_CHANGED" ]; then
-                  echo "✅ Files changed in the latest commit:"
-                  echo "$FILES_CHANGED"
-                  echo "changed=true" >> "$GITHUB_OUTPUT"
-              else
-                  echo "ℹ️ No files changed in the latest commit."
-                  echo "changed=false" >> "$GITHUB_OUTPUT"
-              fi
+          if [ "$CURRENT_COMMIT" != "$LAST_COMMIT" ]; then
+            echo "✅ New commit detected. Release needed."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-              echo "ℹ️ No new commits detected since the last workflow run."
-              echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ No new commits. Skipping release."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-  release-if-changed:
-    needs: check-for-latest-changes
-    if: needs.check-for-latest-changes.outputs.changed == 'true'
+      - name: Save current commit to artifact (for next run)
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          echo "$CURRENT_COMMIT" > .last_release_commit
+
+      - name: Upload commit file
+        if: steps.check.outputs.changed == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: last-release-commit
+          path: .last_release_commit
+
+  release:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Perform Release
-        run: |
-          echo "🚀 Releasing based on latest commit changes."
-          # Simulate or run your actual release command here
+      - name: Download last commit record
+        uses: actions/download-artifact@v3
+        with:
+          name: last-release-commit
 
-  skip-release-if-no-change:
-    needs: check-for-latest-changes
-    if: needs.check-for-latest-changes.outputs.changed == 'false'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Notify no changes
+      - name: Perform release
         run: |
-          echo "ℹ️ No changes found in the latest commit. Skipping release."
+          echo "🚀 Performing release for new commit..."
+          # Release logic here (e.g. build, publish, etc.)
