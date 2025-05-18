@@ -1,4 +1,4 @@
-name: Release if New Commit Exists
+name: Release if New Commit Exists and Changes Detected
 
 on:
   workflow_dispatch:     # Manual trigger
@@ -26,13 +26,27 @@ jobs:
           if [ -n "$TAG_EXISTS" ]; then
             echo "ℹ️ Commit already tagged. Skipping release."
             echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "✅ New commit detected, ready to release."
+            exit 0
+          fi
+
+          # Show files changed in the latest commit
+          CHANGED_FILES=$(git show --pretty="" --name-only "$LATEST_COMMIT")
+          echo "📝 Files changed in the latest commit:"
+          echo "$CHANGED_FILES"
+
+          # If files are changed, mark as changed
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "✅ Files changed detected."
+            echo "$CHANGED_FILES" >> "$GITHUB_OUTPUT"
             echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ℹ️ No files changed in the latest commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
     outputs:
       changed: ${{ steps.detect.outputs.changed }}
+      changed_files: ${{ steps.detect.outputs.changed_files }}
 
   release:
     needs: check-and-release
@@ -43,9 +57,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Run Release
+      - name: Perform Release
         run: |
-          echo "🚀 Releasing new version from commit: ${{ needs.check-and-release.outputs.LATEST_COMMIT }}"
+          echo "🚀 Releasing new version based on the latest commit changes."
 
       - name: Tag the commit to prevent future duplicate releases
         run: |
@@ -59,4 +73,4 @@ jobs:
 
     steps:
       - name: Skip release
-        run: echo "ℹ️ No new commits found. Skipping release."
+        run: echo "ℹ️ No new changes detected in the latest commit. Skipping release."
