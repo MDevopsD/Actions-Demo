@@ -1,0 +1,50 @@
+name: Release if New Commit Exists
+
+on:
+  schedule:
+    - cron: '0 2 * * *'       # Every day at 2 AM UTC
+  workflow_dispatch:          # Manual trigger
+
+jobs:
+  check-for-commit:
+    runs-on: ubuntu-latest
+
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Ensure full history
+
+      - name: Check if a commit exists in last 24h
+        id: check
+        run: |
+          RECENT_COMMIT=$(git log --since="24 hours ago" --pretty=format:"%H" -n 1)
+          
+          if [ -n "$RECENT_COMMIT" ]; then
+            echo "✅ Commit detected in the last 24 hours: $RECENT_COMMIT"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "ℹ️ No commit in the last 24 hours."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  release:
+    needs: check-for-commit
+    if: needs.check-for-commit.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Do the release
+        run: |
+          echo "🚀 Releasing! New commit found."
+
+  no-release:
+    needs: check-for-commit
+    if: needs.check-for-commit.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip release
+        run: |
+          echo "❌ No new commit. Skipping release."
