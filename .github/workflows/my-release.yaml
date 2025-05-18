@@ -21,7 +21,7 @@ jobs:
       - name: Check for new commits in the last hour
         id: check_changes
         run: |
-          if git log origin/main --since="1 hour ago" --pretty=oneline | grep .; then
+          if git log origin/main --since="24 hour ago" --pretty=oneline | grep .; then
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "changed=false" >> $GITHUB_OUTPUT
