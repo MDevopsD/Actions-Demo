@@ -1,9 +1,9 @@
-name: Check for Changes and Release
+name: my testing
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # Every day at 2 AM UTC
-  workflow_dispatch:     # Allow manual triggering
+    - cron: '0 2 * * *'  # Trigger every day at 2 AM UTC
+  workflow_dispatch:       # Allows manual trigger
   push:
 jobs:
   check-for-changes:
@@ -16,25 +16,28 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Ensures we have full git history
+          fetch-depth: 0  # Fetch full history to check commits from any point
 
-      - name: Get the last commit hash
+      - name: Fetch latest changes
+        run: |
+          git fetch --all  # Fetch all changes from the remote repository
+
+      - name: Get the last commit hash from the latest commit
         id: get_last_commit
         run: |
-          # Get the last commit hash (it will be the last commit from HEAD)
-          LAST_COMMIT=$(git log -n 1 --pretty=format:"%H")
-          echo "🕓 Last commit: $LAST_COMMIT"
-          echo "last_commit=$LAST_COMMIT" >> $GITHUB_ENV
+          LAST_COMMIT_HASH=$(git log -n 1 --pretty=format:"%H")
+          echo "Last commit hash: $LAST_COMMIT_HASH"
+          echo "last_commit_hash=$LAST_COMMIT_HASH" >> $GITHUB_ENV
 
-      - name: Check for changes since the last commit
+      - name: Check for changes from the last commit to HEAD
         id: check_changes
         run: |
-          # Check for changes between the last commit and the current HEAD
-          CHANGES=$(git diff --name-only $LAST_COMMIT HEAD)
+          # Get the current HEAD commit hash
+          CURRENT_HEAD_HASH=$(git rev-parse HEAD)
 
-          # If there are changes, proceed with setting the 'changed' flag
-          if [ -n "$CHANGES" ]; then
-            echo "✅ Changes detected since last commit."
+          # Compare the last commit hash and the current HEAD hash
+          if [ "$LAST_COMMIT_HASH" != "$CURRENT_HEAD_HASH" ]; then
+            echo "✅ Changes detected between last commit and current HEAD."
             echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "ℹ️ No changes detected since last commit."
@@ -49,7 +52,7 @@ jobs:
       - name: Run tests and release
         run: |
           echo "🚀 Running tests and releasing code..."
-          # Your test and release logic goes here
+          # Your release logic here (e.g., run tests, create release artifacts)
 
   notify-no-changes:
     needs: check-for-changes
@@ -57,4 +60,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: No changes detected
-        run: echo "ℹ️ No changes detected. Skipping release."
+        run: |
+          echo "ℹ️ No changes detected. Skipping release."
