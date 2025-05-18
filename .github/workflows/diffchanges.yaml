@@ -27,7 +27,7 @@ jobs:
 
           # Debug: print commit history
           echo "🔧 Commit history in the last 24h:"
-          git log --since="24 hours ago" --oneline || echo "No commits"
+          git log --since="1 hours ago" --oneline || echo "No commits"
 
           # Get latest commit hash in last 24 hours
           RECENT_COMMIT=$(git log --since="24 hours ago" --pretty=format:"%H" -n 1)
