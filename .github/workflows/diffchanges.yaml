@@ -1,76 +1,62 @@
-name: Smart Detect and Release
+name: Release if New Commit Exists
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:     # Manual trigger
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'   # Scheduled trigger at 2 AM UTC
 
 jobs:
-  detect-changes:
+  check-and-release:
     runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.check.outputs.changed }}
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Important to access commit history and tags
 
-      - name: Get current commit
-        id: check
+      - name: Get the latest commit hash
+        id: detect
         run: |
-          echo "🔍 Detecting changes for release..."
+          LATEST_COMMIT=$(git rev-parse HEAD)
+          echo "🧾 Latest commit: $LATEST_COMMIT"
 
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "🧾 Current HEAD: $CURRENT_COMMIT"
-
-          # Create a file to store last released commit if it doesn't exist
-          if [ ! -f .last_release_commit ]; then
-            echo "⏳ No last release commit found, treating as first release."
-            echo "$CURRENT_COMMIT" > .last_release_commit
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          LAST_COMMIT=$(cat .last_release_commit)
-          echo "🧾 Last released commit: $LAST_COMMIT"
-
-          if [ "$CURRENT_COMMIT" != "$LAST_COMMIT" ]; then
-            echo "✅ New commit detected. Release needed."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ℹ️ No new commits. Skipping release."
+          # Check if the latest commit has been tagged
+          TAG_EXISTS=$(git tag --points-at "$LATEST_COMMIT")
+          if [ -n "$TAG_EXISTS" ]; then
+            echo "ℹ️ Commit already tagged. Skipping release."
             echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "✅ New commit detected, ready to release."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Save current commit to artifact (for next run)
-        if: steps.check.outputs.changed == 'true'
-        run: |
-          echo "$CURRENT_COMMIT" > .last_release_commit
-
-      - name: Upload commit file
-        if: steps.check.outputs.changed == 'true'
-        uses: actions/upload-artifact@v3
-        with:
-          name: last-release-commit
-          path: .last_release_commit
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
 
   release:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.changed == 'true'
+    needs: check-and-release
+    if: needs.check-and-release.outputs.changed == 'true'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Download last commit record
-        uses: actions/download-artifact@v3
-        with:
-          name: last-release-commit
-
-      - name: Perform release
+      - name: Run Release
         run: |
-          echo "🚀 Performing release for new commit..."
-          # Release logic here (e.g. build, publish, etc.)
+          echo "🚀 Releasing new version from commit: ${{ needs.check-and-release.outputs.LATEST_COMMIT }}"
+
+      - name: Tag the commit to prevent future duplicate releases
+        run: |
+          git tag "release-${{ needs.check-and-release.outputs.LATEST_COMMIT }}"
+          git push origin --tags
+
+  skip-release:
+    needs: check-and-release
+    if: needs.check-and-release.outputs.changed == 'false'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Skip release
+        run: echo "ℹ️ No new commits found. Skipping release."
