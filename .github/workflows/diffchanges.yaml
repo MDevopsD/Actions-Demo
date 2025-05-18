@@ -1,8 +1,9 @@
 name: Detect and Release on Recent Changes
 
 on:
-  push:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'  # Every day at 2 AM UTC
+  workflow_dispatch:     # Allow manual triggering
 
 jobs:
   check-for-changes:
@@ -15,71 +16,53 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Important to access full commit history
 
-      - name: Check for file changes in the last hour
+      - name: Check for file changes in the last 24 hours
         id: check_changes
         run: |
-          BRANCH="${GITHUB_REF#refs/heads/}"
-          echo "🔍 Checking for file changes on: $BRANCH"
+          set -e
 
-          git fetch origin "$BRANCH"
-          LAST_COMMIT=$(git rev-list -1 --before='1 hour ago' "origin/$BRANCH")
-          echo "🕓 Commit before 1 hour: $LAST_COMMIT"
+          echo "🔍 Checking for commits in the last 24 hours..."
 
-          CHANGES=$(git diff --name-only "origin/$BRANCH" "$LAST_COMMIT")
+          # Debug: print commit history
+          echo "🔧 Commit history in the last 24h:"
+          git log --since="24 hours ago" --oneline || echo "No commits"
+
+          # Get latest commit hash in last 24 hours
+          RECENT_COMMIT=$(git log --since="24 hours ago" --pretty=format:"%H" -n 1)
+
+          if [ -z "$RECENT_COMMIT" ]; then
+            echo "ℹ️ No recent commits in last 24 hours."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "🕓 Last commit: $RECENT_COMMIT"
+
+          # Detect changes in files since that commit
+          CHANGES=$(git diff --name-only "$RECENT_COMMIT"..HEAD)
 
           if [ -n "$CHANGES" ]; then
-            echo "✅ Changes found:"
+            echo "✅ Changes detected:"
             echo "$CHANGES"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "ℹ️ No changes found."
+            echo "ℹ️ Commit found but no file changes."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
-
   test-and-release:
     needs: check-for-changes
     if: needs.check-for-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout the code
-        uses: actions/checkout@v3
+      - name: Do your release
+        run: echo "🚀 Releasing code..."
 
-      - name: Run tests
-        id: run_tests
-        run: |
-          echo "🧪 Running tests..."
-          # Dummy test command simulation
-          echo "tests=passed" >> $GITHUB_OUTPUT
-
-      - name: Create and upload artifact
-        if: steps.run_tests.outputs.tests == 'passed'
-        uses: actions/upload-artifact@v3
-        with:
-          name: release-artifact
-          path: ./dist  # Replace with actual output
-
-      - name: Send success email (dummy)
-        if: steps.run_tests.outputs.tests == 'passed'
-        run: |
-          echo "📧 Sending success email..."
-          echo "✅ Release completed successfully!"
-
-      - name: Send failure email (dummy)
-        if: failure()
-        run: |
-          echo "📧 Sending failure email..."
-          echo "❌ Tests failed. Investigate the issue."
-
-  notify-no-changes:
+  no-changes:
     needs: check-for-changes
     if: needs.check-for-changes.outputs.changed == 'false'
     runs-on: ubuntu-latest
-
     steps:
-      - name: Notify no changes (dummy)
-        run: |
-          echo "📧 Sending no-change email..."
-          echo "ℹ️ No changes detected. Skipping release."
+      - name: No changes detected
+        run: echo "ℹ️ No changes in last 24 hours. Skipping release."
