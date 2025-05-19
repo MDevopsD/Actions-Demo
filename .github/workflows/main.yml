@@ -1,4 +1,4 @@
-name: Release on Repo Changes
+name: Release on Repo Changes TAg
 
 on:
   workflow_dispatch:  # Manual trigger
