@@ -1,4 +1,4 @@
-name: Release on Changes Without Tags
+name: Release on Repo Changes
 
 on:
   workflow_dispatch:
@@ -6,50 +6,63 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
-  check-and-release:
+  release-if-new-commit:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout current repo
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-    - name: Get current commit
-      id: current
-      run: echo "hash=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+      - name: Get current commit SHA
+        id: current
+        run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
-    - name: Fetch last released commit from state branch
-      id: last
-      run: |
-        git fetch origin release-state:release-state || git checkout -b release-state
-        LAST_COMMIT=$(git show origin/release-state:last_commit.txt 2>/dev/null || echo "")
-        echo "Last release commit: $LAST_COMMIT"
-        echo "last_commit=$LAST_COMMIT" >> $GITHUB_OUTPUT
+      - name: Download last released SHA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: last-released-sha
+        continue-on-error: true  # In case no artifact exists yet
 
-    - name: Check if release is needed
-      id: check
-      run: |
-        if [ "${{ steps.current.outputs.hash }}" != "${{ steps.last.outputs.last_commit }}" ]; then
-          echo "changed=true" >> $GITHUB_OUTPUT
-        else
-          echo "changed=false" >> $GITHUB_OUTPUT
-        fi
+      - name: Read last released SHA
+        id: get-last-sha
+        run: |
+          if [ -f last_sha.txt ]; then
+            LAST_SHA=$(cat last_sha.txt)
+          else
+            LAST_SHA=""
+          fi
+          echo "Last released SHA: $LAST_SHA"
+          echo "last_sha=$LAST_SHA" >> $GITHUB_OUTPUT
+          
 
-    - name: Run release if changed
-      if: steps.check.outputs.changed == 'true'
-      run: |
-        echo "Changes detected — releasing..."
-        # Your release logic here (e.g., tag, deploy, upload, etc.)
+      - name: Compare with last released SHA
+        id: compare
+        run: |
+          if [ "${{ steps.current.outputs.sha }}" = "${{ steps.get-last-sha.outputs.last_sha }}" ]; then
+            echo "No new commit to release."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "New commit detected."
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
 
-    - name: Update last_commit.txt and push to state branch
-      if: steps.check.outputs.changed == 'true'
-      run: |
-        echo "${{ steps.current.outputs.hash }}" > last_commit.txt
-        git config user.name "github-actions"
-        git config user.email "actions@github.com"
-        git checkout -B release-state
-        git add last_commit.txt
-        git commit -m "Update last release commit"
-        git push origin release-state --force
+      - name: Perform release actions
+        if: steps.compare.outputs.changed == 'true'
+        run: |
+          echo "✅ Releasing commit ${{ steps.current.outputs.sha }}..."
+          # Your actual release logic
+
+      - name: Upload current SHA as artifact
+        if: steps.compare.outputs.changed == 'true'
+        run: echo "${{ steps.current.outputs.sha }}" > last_sha.txt
+
+      - name: Save artifact (last released SHA)
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: last-released-sha
+          path: last_sha.txt
